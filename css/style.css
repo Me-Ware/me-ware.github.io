@@ -24,6 +24,7 @@
 
 html {
   scroll-behavior: auto;
+  touch-action: pan-y;
 }
 
 html,
@@ -35,12 +36,22 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   max-width: 100%;
-  overscroll-behavior-x: none;
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: clip;
+}
+
+.page {
+  width: 100%;
+  max-width: 100%;
 }
 
 main {
   width: 100%;
   max-width: 100%;
+  overflow-x: clip;
 }
 
 
@@ -366,6 +377,7 @@ body:not(.is-ready) .hero .eyebrow {
   justify-content: center;
   padding: calc(var(--nav) + 48px) var(--gutter) 80px;
   overflow: hidden;
+  overflow-anchor: none;
 }
 
 .chapter-orbs {
@@ -513,6 +525,7 @@ body:not(.is-ready) .hero .eyebrow {
   justify-content: flex-start;
   padding: calc(var(--nav) + 32px) var(--gutter) 36px;
   overflow: hidden;
+  overflow-anchor: none;
 }
 
 .journey-stage {
@@ -1080,15 +1093,23 @@ body:not(.is-ready) .hero .eyebrow {
   }
 }
 
-@media (pointer: coarse) {
-  .word,
-  .orb,
-  .meware-portrait {
-    will-change: auto;
+@media (pointer: coarse), (max-width: 980px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
   }
-}
 
-@media (max-width: 980px) {
+  .page {
+    height: 100svh;
+    max-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+
   .hero {
     min-height: 100svh;
   }
@@ -1101,6 +1122,12 @@ body:not(.is-ready) .hero .eyebrow {
     height: 100svh;
   }
 
+  .scroll-progress {
+    animation: none;
+  }
+}
+
+@media (max-width: 980px) {
   .nav-links,
   .nav-cta {
     display: none;

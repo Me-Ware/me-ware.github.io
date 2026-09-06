@@ -3,6 +3,9 @@
   const isTouch =
     window.matchMedia("(pointer: coarse)").matches ||
     window.matchMedia("(max-width: 980px)").matches;
+  const page = document.querySelector("[data-page]");
+  const scrollRoot = isTouch && page ? page : window;
+  const getScrollY = () => (scrollRoot === window ? window.scrollY : scrollRoot.scrollTop);
 
   const journeyCopy = [
     {
@@ -69,7 +72,7 @@
   });
 
   const updateNav = () => {
-    const y = window.scrollY;
+    const y = getScrollY();
     nav?.classList.toggle("is-scrolled", y > 12);
 
     const mid = 80;
@@ -231,12 +234,24 @@
   const boot = () => {
     document.body.classList.add("is-ready");
     updateNav();
-    window.addEventListener("scroll", updateNav, { passive: true });
+    scrollRoot.addEventListener("scroll", updateNav, { passive: true });
+
+    if (isTouch) {
+      document.querySelectorAll("input, textarea").forEach((el) => {
+        el.addEventListener("focus", () => {
+          requestAnimationFrame(() => {
+            el.scrollIntoView({ block: "center", behavior: "smooth" });
+          });
+        });
+      });
+    }
 
     if (reduce || typeof gsap === "undefined") return;
 
     gsap.registerPlugin(ScrollTrigger);
     ScrollTrigger.config({ ignoreMobileResize: true });
+    if (isTouch && page) ScrollTrigger.defaults({ scroller: page });
+    const scrub = (delay) => (isTouch ? true : delay);
 
     let lenis = null;
     if (typeof Lenis !== "undefined" && !isTouch) {
@@ -280,31 +295,29 @@
       ease: "power2.out",
     });
 
-    if (!isTouch) {
-      gsap.to(".hero-inner", {
-        y: -70,
-        opacity: 0,
-        scale: 0.97,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".hero",
-          start: "top top",
-          end: "bottom top",
-          scrub: true,
-        },
-      });
+    gsap.to(".hero-inner", {
+      y: -70,
+      opacity: 0,
+      scale: 0.97,
+      ease: "none",
+      scrollTrigger: {
+        trigger: ".hero",
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
 
-      gsap.to(".hero-glow", {
-        y: 120,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".hero",
-          start: "top top",
-          end: "bottom top",
-          scrub: true,
-        },
-      });
-    }
+    gsap.to(".hero-glow", {
+      y: 120,
+      ease: "none",
+      scrollTrigger: {
+        trigger: ".hero",
+        start: "top top",
+        end: "bottom top",
+        scrub: true,
+      },
+    });
 
     const storyWords = document.querySelectorAll("[data-chapter] .word, .results-intro .word");
     if (isTouch) {
@@ -369,42 +382,40 @@
       });
     });
 
-    if (!isTouch) {
-      document.querySelectorAll(".chapter-dark").forEach((section) => {
-        section.querySelectorAll(".orb").forEach((orb, i) => {
-          const rise = [160, 260, 120, 300, 200][i] || 180;
-          gsap.fromTo(
-            orb,
-            { y: 80 },
-            {
-              y: -rise,
-              ease: "none",
-              scrollTrigger: {
-                trigger: section,
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 0.6,
-              },
-            }
-          );
-        });
+    document.querySelectorAll(".chapter-dark").forEach((section) => {
+      section.querySelectorAll(".orb").forEach((orb, i) => {
+        const rise = [160, 260, 120, 300, 200][i] || 180;
+        gsap.fromTo(
+          orb,
+          { y: 80 },
+          {
+            y: -rise,
+            ease: "none",
+            scrollTrigger: {
+              trigger: section,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: scrub(0.6),
+            },
+          }
+        );
       });
+    });
 
-      gsap.fromTo(
-        ".meware-portrait",
-        { y: 50 },
-        {
-          y: -120,
-          ease: "none",
-          scrollTrigger: {
-            trigger: ".meware",
-            start: "top 90%",
-            end: "bottom top",
-            scrub: 0.85,
-          },
-        }
-      );
-    }
+    gsap.fromTo(
+      ".meware-portrait",
+      { y: 50 },
+      {
+        y: -120,
+        ease: "none",
+        scrollTrigger: {
+          trigger: ".meware",
+          start: "top 90%",
+          end: "bottom top",
+          scrub: scrub(0.85),
+        },
+      }
+    );
 
     const journey = document.querySelector("[data-journey]");
     const journeyLine = document.querySelector("[data-journey-line]");
@@ -433,7 +444,7 @@
     }
 
     const progressBar = document.querySelector(".scroll-progress");
-    if (progressBar && !CSS.supports("animation-timeline", "scroll()")) {
+    if (progressBar && (isTouch || !CSS.supports("animation-timeline", "scroll()"))) {
       ScrollTrigger.create({
         start: 0,
         end: "max",
@@ -459,32 +470,30 @@
       });
     }
 
-    if (!isTouch) {
-      const driftMap = {
-        left: { x: 64, y: 0 },
-        right: { x: -64, y: 0 },
-        up: { x: 0, y: 56 },
-      };
+    const driftMap = {
+      left: { x: 64, y: 0 },
+      right: { x: -64, y: 0 },
+      up: { x: 0, y: 56 },
+    };
 
-      document.querySelectorAll("[data-drift]").forEach((el) => {
-        const from = driftMap[el.dataset.drift] || driftMap.up;
-        gsap.fromTo(
-          el,
-          { x: from.x, y: from.y },
-          {
-            x: 0,
-            y: 0,
-            ease: "none",
-            scrollTrigger: {
-              trigger: el,
-              start: "top bottom",
-              end: "top 38%",
-              scrub: 0.9,
-            },
-          }
-        );
-      });
-    }
+    document.querySelectorAll("[data-drift]").forEach((el) => {
+      const from = driftMap[el.dataset.drift] || driftMap.up;
+      gsap.fromTo(
+        el,
+        { x: from.x, y: from.y },
+        {
+          x: 0,
+          y: 0,
+          ease: "none",
+          scrollTrigger: {
+            trigger: el,
+            start: "top bottom",
+            end: "top 38%",
+            scrub: scrub(0.9),
+          },
+        }
+      );
+    });
 
     const navLinks = [...document.querySelectorAll(".nav-links a")];
     const sections = [
