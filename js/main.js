@@ -56,19 +56,49 @@
   const toggle = document.querySelector("[data-nav-toggle]");
   const mobile = document.querySelector("[data-nav-mobile]");
   const lightZones = ["#diseno", "#software", "#resultados"];
+  const sectionNav = [
+    { id: "diseno", label: "Diseño" },
+    { id: "software", label: "Software" },
+    { id: "experiencias", label: "Experiencias" },
+    { id: "contacto", label: "Contacto" },
+  ].filter((item) => document.getElementById(item.id));
 
   const closeMobile = () => {
     toggle?.classList.remove("is-open");
     mobile?.classList.remove("is-open");
   };
 
+  const scrollToTarget = (target) => {
+    if (!target) return;
+    if (isTouch && page) {
+      const y =
+        target.getBoundingClientRect().top -
+        page.getBoundingClientRect().top +
+        page.scrollTop;
+      page.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  if (mobile) {
+    mobile.innerHTML = sectionNav
+      .map((item) => `<a href="#${item.id}">${item.label}</a>`)
+      .join("");
+    mobile.addEventListener("click", (e) => {
+      const link = e.target.closest("a[href^='#']");
+      if (!link) return;
+      const target = document.getElementById(link.getAttribute("href").slice(1));
+      if (!target) return;
+      e.preventDefault();
+      closeMobile();
+      requestAnimationFrame(() => scrollToTarget(target));
+    });
+  }
+
   toggle?.addEventListener("click", () => {
     toggle.classList.toggle("is-open");
     mobile?.classList.toggle("is-open");
-  });
-
-  mobile?.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", closeMobile);
   });
 
   const updateNav = () => {
@@ -131,8 +161,32 @@
   }
 
   const form = document.querySelector("[data-form]");
+  const emailField = form?.querySelector('[name="email"]');
+  const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const syncEmailValidity = () => {
+    if (!emailField) return true;
+    const value = emailField.value.trim();
+    if (!value) {
+      emailField.setCustomValidity("Ingresa tu correo");
+      return false;
+    }
+    if (!isValidEmail(value)) {
+      emailField.setCustomValidity("Ingresa un correo válido");
+      return false;
+    }
+    emailField.setCustomValidity("");
+    return true;
+  };
+
+  emailField?.addEventListener("input", syncEmailValidity);
+  emailField?.addEventListener("blur", syncEmailValidity);
   form?.addEventListener("submit", (e) => {
     e.preventDefault();
+    if (!syncEmailValidity()) {
+      emailField.reportValidity();
+      emailField.focus();
+      return;
+    }
     const data = new FormData(form);
     const name = String(data.get("name") || "").trim();
     const email = String(data.get("email") || "").trim();
@@ -213,18 +267,46 @@
     if (!pair) return;
     paintJourneyTrack(pairIndex);
 
-    const cards = document.querySelectorAll("[data-journey-slot]");
-    if (reduce || isTouch || typeof gsap === "undefined") {
+    const cards = [...document.querySelectorAll("[data-journey-slot]")];
+    if (reduce || typeof gsap === "undefined") {
       cards.forEach((card, i) => {
         if (pair[i]) fillJourneyCard(card, pair[i]);
       });
       return;
     }
 
-    cards.forEach((card) => {
-      gsap.killTweensOf(card.querySelectorAll(".journey-kicker, .journey-heading, .journey-text, .word"));
+    const isFirst = !cards.some((card) => card.dataset.journeyReady);
+    cards.forEach((card, i) => {
+      const step = pair[i];
+      if (!step) return;
+      gsap.killTweensOf(card);
+      const show = () => {
+        fillJourneyCard(card, step);
+        card.dataset.journeyReady = "true";
+        gsap.fromTo(
+          card,
+          { y: 28, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.5,
+            delay: i * 0.07,
+            ease: "power2.out",
+          }
+        );
+      };
+      if (isFirst) {
+        show();
+        return;
+      }
+      gsap.to(card, {
+        y: 16,
+        opacity: 0,
+        duration: 0.22,
+        ease: "power2.in",
+        onComplete: show,
+      });
     });
-    revealJourneyPair(pair);
   };
 
   document.querySelectorAll("[data-journey-track] button").forEach((btn, i) => {
@@ -236,13 +318,78 @@
     updateNav();
     scrollRoot.addEventListener("scroll", updateNav, { passive: true });
 
-    if (isTouch) {
+    if (isTouch && page) {
+      let focusedField = null;
+      let formScroll = null;
+      let pinUntil = 0;
+
+      const keepFieldVisible = (el) => {
+        if (!el) return;
+        const vv = window.visualViewport;
+        const viewTop = vv ? vv.offsetTop : 0;
+        const viewBottom = viewTop + (vv ? vv.height : page.clientHeight);
+        const navGap = 64;
+        const pad = 12;
+        const rect = el.getBoundingClientRect();
+        const topLimit = viewTop + navGap;
+        const bottomLimit = viewBottom - pad;
+        if (rect.top < topLimit || rect.bottom > bottomLimit) {
+          page.scrollTop += rect.top - topLimit;
+        }
+        formScroll = page.scrollTop;
+      };
+
+      const stayOnForm = () => {
+        if (formScroll == null) return;
+        if (Math.abs(page.scrollTop - formScroll) < 4) return;
+        page.scrollTop = formScroll;
+      };
+
+      const pinForm = (ms) => {
+        pinUntil = Date.now() + ms;
+        const tick = () => {
+          if (Date.now() > pinUntil) return;
+          if (!focusedField) stayOnForm();
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      };
+
       document.querySelectorAll("input, textarea").forEach((el) => {
         el.addEventListener("focus", () => {
-          requestAnimationFrame(() => {
-            el.scrollIntoView({ block: "center", behavior: "smooth" });
-          });
+          focusedField = el;
+          keepFieldVisible(el);
+          window.setTimeout(() => keepFieldVisible(el), 120);
+          window.setTimeout(() => keepFieldVisible(el), 360);
         });
+        el.addEventListener("input", () => {
+          if (focusedField === el) formScroll = page.scrollTop;
+        });
+        el.addEventListener("blur", () => {
+          window.setTimeout(() => {
+            const active = document.activeElement;
+            const stillEditing =
+              active instanceof HTMLElement &&
+              (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+            if (stillEditing) return;
+            focusedField = null;
+            stayOnForm();
+            pinForm(1200);
+          }, 10);
+        });
+      });
+
+      page.addEventListener(
+        "scroll",
+        () => {
+          if (!focusedField && Date.now() < pinUntil) stayOnForm();
+        },
+        { passive: true }
+      );
+
+      window.visualViewport?.addEventListener("resize", () => {
+        if (focusedField) keepFieldVisible(focusedField);
+        else if (Date.now() < pinUntil) stayOnForm();
       });
     }
 
@@ -267,6 +414,7 @@
     }
 
     document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+      if (mobile?.contains(anchor)) return;
       anchor.addEventListener("click", (e) => {
         const id = anchor.getAttribute("href");
         if (!id || id === "#") return;
@@ -275,7 +423,7 @@
         e.preventDefault();
         closeMobile();
         if (lenis) lenis.scrollTo(target, { offset: 0 });
-        else target.scrollIntoView({ behavior: "smooth", block: "start" });
+        else scrollToTarget(target);
       });
     });
 
@@ -293,6 +441,13 @@
       opacity: 0,
       duration: 0.9,
       ease: "power2.out",
+    });
+
+    gsap.from(".hero-cta", {
+      opacity: 0,
+      duration: 1,
+      ease: "power2.out",
+      delay: 0.85,
     });
 
     gsap.to(".hero-inner", {
@@ -352,20 +507,24 @@
       });
     }
 
-    const ctaWords = document.querySelectorAll(".cta .word");
-    gsap.set(ctaWords, { yPercent: 110, opacity: 0 });
-    gsap.to(ctaWords, {
-      yPercent: 0,
-      opacity: 1,
-      duration: 0.95,
-      stagger: 0.05,
-      ease: "power3.out",
-      scrollTrigger: {
-        trigger: ".cta-copy",
-        start: "top 82%",
-        once: true,
-      },
-    });
+    const cta = document.querySelector("#contacto");
+    if (cta) {
+      gsap.set(cta.querySelectorAll(".word"), { yPercent: 0, opacity: 1 });
+      gsap.fromTo(
+        cta.querySelectorAll(".cta-copy, .form"),
+        { y: isTouch ? 72 : 120 },
+        {
+          y: 0,
+          ease: "none",
+          scrollTrigger: {
+            trigger: cta,
+            start: "top bottom",
+            end: "top 22%",
+            scrub: scrub(0.7),
+          },
+        }
+      );
+    }
 
     document.querySelectorAll(".reveal-fade").forEach((el) => {
       gsap.set(el, { y: 24, opacity: 0 });
