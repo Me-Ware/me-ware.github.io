@@ -58,7 +58,7 @@
   const lightZones = ["#diseno", "#software", "#resultados"];
   const sectionNav = [
     { id: "diseno", label: "Diseño" },
-    { id: "software", label: "Software" },
+    { id: "resultados", label: "Interfaces" },
     { id: "experiencias", label: "Experiencias" },
     { id: "contacto", label: "Contacto" },
   ].filter((item) => document.getElementById(item.id));
@@ -657,11 +657,11 @@
     const navLinks = [...document.querySelectorAll(".nav-links a")];
     const sections = [
       ["#negocio", 0],
-      ["#necesidades", 1],
-      ["#diseno", 2],
-      ["#desarrollo", 3],
-      ["#software", 4],
-      ["#resultados", 5],
+      ["#necesidades", 0],
+      ["#diseno", 1],
+      ["#desarrollo", 2],
+      ["#software", 3],
+      ["#resultados", 3],
     ];
 
     sections.forEach(([sel, i]) => {
